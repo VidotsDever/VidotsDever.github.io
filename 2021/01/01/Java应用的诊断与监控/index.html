@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next muse use-motion" lang="zh-Hans">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css" />
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css" />
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="技术研究," />
+
+
+
+
+
+
+
+
+
+
+<meta name="description" content="本篇博客主要针对Java虚拟机的内存，分别从JMX的使用、捕获Java堆的dump以及使用JOL库来查看对象的内存布局。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Java应用的诊断与监控">
+<meta property="og:url" content="http://vidots.com/2021/01/01/Java%E5%BA%94%E7%94%A8%E7%9A%84%E8%AF%8A%E6%96%AD%E4%B8%8E%E7%9B%91%E6%8E%A7/index.html">
+<meta property="og:site_name" content="追寻风的方向">
+<meta property="og:description" content="本篇博客主要针对Java虚拟机的内存，分别从JMX的使用、捕获Java堆的dump以及使用JOL库来查看对象的内存布局。">
+<meta property="og:locale">
+<meta property="article:published_time" content="2021-01-01T06:40:11.000Z">
+<meta property="article:modified_time" content="2021-01-16T12:59:55.443Z">
+<meta property="article:author" content="vidots">
+<meta property="article:tag" content="技术研究">
+<meta name="twitter:card" content="summary">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '',
+    scheme: 'Muse',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="http://vidots.com/2021/01/01/Java应用的诊断与监控/"/>
+
+
+
+
+
+  <title>Java应用的诊断与监控 | 追寻风的方向</title>
+  
+
+
+
+
+
+
+
+
+<meta name="generator" content="Hexo 5.2.0"></head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/"  class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">追寻风的方向</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle">海纳百川,有容乃大;壁立千仞,无欲则刚</p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br />
+            
+            标签
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-categories">
+          <a href="/categories/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-th"></i> <br />
+            
+            分类
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            归档
+          </a>
+        </li>
+      
+
+      
+    </ul>
+  
+
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://vidots.com/2021/01/01/Java%E5%BA%94%E7%94%A8%E7%9A%84%E8%AF%8A%E6%96%AD%E4%B8%8E%E7%9B%91%E6%8E%A7/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="追寻风的方向">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">Java应用的诊断与监控</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2021-01-01T14:40:11+08:00">
+                2021-01-01
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">分类于</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E6%8A%80%E6%9C%AF/" itemprop="url" rel="index">
+                    <span itemprop="name">技术</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>本篇博客主要针对Java虚拟机的内存，分别从JMX的使用、捕获Java堆的dump以及使用JOL库来查看对象的内存布局。</p>
+<a id="more"></a> 
+
+<h1 id="JMX的基本介绍"><a href="#JMX的基本介绍" class="headerlink" title="JMX的基本介绍"></a>JMX的基本介绍</h1><p>JMX(<code>Java Management Extensions</code>)框架可以用来管理本地或远程的Java程序，该框架引入MBean的概念，用于实时地管理应用。本部分介绍如何创建基本的<code>MBean</code>，并通过<code>JConsole</code>来对其管理。</p>
+<h4 id="JMX的架构"><a href="#JMX的架构" class="headerlink" title="JMX的架构"></a>JMX的架构</h4><p>JMX遵循<strong>三层</strong>架构：</p>
+<ul>
+<li>诊断层(Instrumentation Layer)：在该层上，将MBean注册到JMX代理上，通过MBean来管理资源；</li>
+<li>JMX代理层(JMX agent Layer)：该层提供核心组件(<code>MbeanServer</code>)用于维护所管理的MBean的注册中心；</li>
+<li>远程管理层(Remote management Layer)：使用客户端工具，例如<code>JConsole</code>；</li>
+</ul>
+<h4 id="创建MBean类"><a href="#创建MBean类" class="headerlink" title="创建MBean类"></a>创建MBean类</h4><p>创建MBean类的时候需要遵循一种特定的模式：MBean类必须要实现一个接口，该接口的名字规则是”类名+MBean”。</p>
+<p>首先定义一个MBean接口：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">public interface GameMBean &#123;</span><br><span class="line">    public void playFootball(String clubName);</span><br><span class="line">    public String getPlayName();</span><br><span class="line">    public void setPlayerName(String playerName);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>定义一个MBean类实现以上的接口：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">public class Game implements GameMBean &#123;</span><br><span class="line"></span><br><span class="line">    private String playerName;</span><br><span class="line"></span><br><span class="line">    public void playFootball(String clubName) &#123;</span><br><span class="line">        System.out.println(this.playerName + &quot; playing football for &quot; + clubName);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    public String getPlayName() &#123;</span><br><span class="line">        System.out.println(&quot;Return playName &quot; + this.playerName);</span><br><span class="line">        return playerName;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    public void setPlayerName(String playerName) &#123;</span><br><span class="line">        System.out.println(&quot;Set playerName to value &quot; + playerName);</span><br><span class="line">        this.playerName &#x3D; playerName;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+
+
+<h4 id="使用JMX代理进行诊断"><a href="#使用JMX代理进行诊断" class="headerlink" title="使用JMX代理进行诊断"></a>使用JMX代理进行诊断</h4><p>JMX代理可以运行在本地或运程，负责管理注册到它上面的MBean。我们会使用<code>PlatformMbeanServer</code>，并将<code>Game</code>这个MBean注册到上面。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">Game game &#x3D; new Game();</span><br><span class="line">try &#123;</span><br><span class="line">    ObjectName objectName &#x3D; new ObjectName(&quot;com.vidots.stock:type&#x3D;basic,name&#x3D;game&quot;);</span><br><span class="line">    MBeanServer server &#x3D; ManagementFactory.getPlatformMBeanServer();</span><br><span class="line">    server.registerMBean(game, objectName);</span><br><span class="line">&#125; catch (MalformedObjectNameException | InstanceAlreadyExistsException | MBeanRegistrationException | NotCompliantMBeanException e) &#123;</span><br><span class="line">    e.printStackTrace();</span><br><span class="line">&#125;</span><br><span class="line">&#x2F;&#x2F; 这里使用死循环是为了测试</span><br><span class="line">while (true) &#123;</span><br><span class="line"></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h4 id="获取MBean"><a href="#获取MBean" class="headerlink" title="获取MBean"></a>获取MBean</h4><p>在控制台输入<code>jconsole</code>来启动<code>JConsole</code>图形化界面，并在上面进行对MBean的控制：</p>
+<ul>
+<li>MBean的属性可以读取和写入；</li>
+<li>MBean的方法可以调用，并提供参数；</li>
+</ul>
+<h1 id="捕获Java堆的Dump"><a href="#捕获Java堆的Dump" class="headerlink" title="捕获Java堆的Dump"></a>捕获Java堆的Dump</h1><p>Java堆的dump是指某个时刻JVM内存中所有对象的快照，可以使用其来诊断内存泄漏问题、优化内存使用。Java堆的dump通常存储在二进制hprof文件中，我们可以使用<code>jhat</code>、<code>JVisualVM</code>、<code>MAT</code>等工具来分析该文件。</p>
+<h4 id="自动捕获堆的dump-推荐"><a href="#自动捕获堆的dump-推荐" class="headerlink" title="自动捕获堆的dump(推荐)"></a>自动捕获堆的dump(推荐)</h4><p>Java提供了<code>HeapDumpOnOutOfMemoryError</code>命令行选项，当抛出<code>java.lang.OutOfMemoryError</code>时候就会产生堆的dump；默认产生的<code>java_pid.hprof</code>文件存放在运行应用的目录。如果想指定文件或目录，可以使用<code>HeapDumpPath</code>选项。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">java -XX:+HeapDumpOnOutOfMemoryError --XX:HeapDumpPath&#x3D;&#x2F;tmp&#x2F;dump.hprof</span><br></pre></td></tr></table></figure>
+
+<h4 id="jmap"><a href="#jmap" class="headerlink" title="jmap"></a>jmap</h4><p>格式：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">jmap -dump:[live],format&#x3D;b,file&#x3D;&lt;file-path&gt; &lt;pid&gt;</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li><code>live</code>：如果设置的话，只会打印出存活的对象，而忽略那些会被垃圾回收的对象；</li>
+<li><code>file-path</code>：指定产生的dump的路径；</li>
+<li><code>pid</code>：Java进程id；</li>
+</ul>
+<p>使用示例：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">jmap -dump:live,format&#x3D;b,file&#x3D;&#x2F;tmp&#x2F;dump.hprof  12587</span><br></pre></td></tr></table></figure>
+
+<h4 id="jcmd"><a href="#jcmd" class="headerlink" title="jcmd"></a>jcmd</h4><p>jcmd的工作原理是它向JVM发送命令请求，必须在Java进程运行的机器上使用它。格式：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">jcmd &lt;pid&gt; GC.heap_dump &lt;file-path&gt;</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li><code>file-path</code>：指定产生的dump的路径；</li>
+<li><code>pid</code>：Java进程id；</li>
+</ul>
+<p>使用示例：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">jcmd 12587 GC.heap_dump &#x2F;tmp&#x2F;dump.hprof</span><br></pre></td></tr></table></figure>
+
+<h4 id="JVisualVM"><a href="#JVisualVM" class="headerlink" title="JVisualVM"></a>JVisualVM</h4><p>JVisualVM是一个图形化用户界面，帮助监控、诊断Java应用，它有个选项，可以用来捕获堆的dump。操作方式：右击一个Java进程，选择<code>Heap Dump</code>选项。</p>
+<h4 id="JMX"><a href="#JMX" class="headerlink" title="JMX"></a>JMX</h4><p>使用<code>HotSpotDiagnostic</code>，这个MBean提供了<code>dumpHeap</code>方法，接收两个参数：</p>
+<ul>
+<li><code>outputFile</code>：dump存放的文件路径；</li>
+<li><code>live</code>：值是true或false，是否只会存活的对象进行dump；</li>
+</ul>
+<p>打开<code>JConsole</code>，连接到指定的Java进程，选择<code>com.sun.management</code> - <code>HotSpotDiagnostic</code> - <code>操作</code> - <code>dumpHeap</code>。</p>
+<h4 id="编程方式"><a href="#编程方式" class="headerlink" title="编程方式"></a>编程方式</h4><p>在Java代码中调用<code>HotSpotDiagnostic</code>：需要获取<code>MBeanServer</code>实例来获取<code>MBean</code>，即获取<code>HotSpotDiagnosticMXBean</code>，然后调用它的<code>dumpHeap</code>方法。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">MBeanServer server &#x3D; ManagementFactory.getPlatformMBeanServer();</span><br><span class="line"></span><br><span class="line">HotSpotDiagnosticMXBean mxBean &#x3D; ManagementFactory.newPlatformMXBeanProxy(server, &quot;com.sun.management:type&#x3D;HotSpotDiagnostic&quot;, HotSpotDiagnosticMXBean.class);</span><br><span class="line"></span><br><span class="line">maxBean.dumpHeap(filePath, live);</span><br></pre></td></tr></table></figure>
+
+<p>注意：<code>hprof</code>文件是不能被重写。</p>
+<h1 id="对象的内存布局"><a href="#对象的内存布局" class="headerlink" title="对象的内存布局"></a>对象的内存布局</h1><p>在这部分，我们将会查看JVM在堆内存中是如何布局对象和数据的；通常，运行时数据区的内存布局并不是JVM声明的一部分，而是交给具体的虚拟器实现者处理。对于对象和数组在内存中的布局，每个虚拟机实现者拥有不同的策略，本部分只针对<code>HotSpot</code>虚拟机。</p>
+<h4 id="OOP-Ordinary-Object-Pointer"><a href="#OOP-Ordinary-Object-Pointer" class="headerlink" title="OOP(Ordinary Object Pointer)"></a>OOP(Ordinary Object Pointer)</h4><p>HotSpot虚拟机使用OOP这种数据结构来表示指向对象的指针；JVM中所有的指针都是基于一种特殊的数据结构，即<code>oopDesc</code>。每个<code>oopDesc</code>使用下面的信息来描述指针：</p>
+<ul>
+<li><code>markWord</code>(c++编写的类)；</li>
+<li><code>Klass</code>(c++编写的类)：可能被压缩；</li>
+</ul>
+<p><code>markWord</code>描述对象的头部(header)，HotSpot虚拟机使用这个<code>markWord</code>来存储<code>identity hash code</code>，<code>biased locking pattern</code>，<code>locking information</code>和<code>GC metadata</code>等。<code>markWord</code>的状态只包含<code>uintptr_t</code>，因此，它的大小在32位机器上是4个字节，而在64位机器上是8个字节。而且，偏向对象(<code>biased objects</code>)和普通对象(<code>normal objects</code>)的<code>markWord</code>是不同的。但是，我们只需考虑普通对象，因为Java15打算舍弃偏向锁。</p>
+<p><code>Klass</code>封装了语言级别的类信息，如类名，类修饰符，父类信息等。  </p>
+<p>Java中的普通对象，使用<code>instanceOop</code>来表示，它的对象头部包含<code>markWord</code>和<code>Klass</code>，外加可能的对齐padding。头部之后，可能有零个或多个实例变量的引用。所以，在64位机器上至少占有16个字节，因为<code>markWord</code>四个字节，<code>Klass</code>四个字节，另四个字节用于<code>padding</code>。</p>
+<p>数组，使用<code>arrayOop</code>表示，它的对象头部除了<code>markWord</code>、<code>Klass</code>和<code>padding</code>外，还有四个字节用于表示数据长度。</p>
+<h4 id="检查内存布局"><a href="#检查内存布局" class="headerlink" title="检查内存布局"></a>检查内存布局</h4><p>使用<code>jol-core</code>依赖项来检测JVM中对象的布局：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">&lt;dependency&gt;</span><br><span class="line">    &lt;groupId&gt;org.openjdk.jol&lt;&#x2F;groupId&gt;</span><br><span class="line">    &lt;artifactId&gt;jol-core&lt;&#x2F;artifactId&gt;</span><br><span class="line">    &lt;version&gt;0.14&lt;&#x2F;version&gt;</span><br><span class="line">&lt;&#x2F;dependency&gt;</span><br></pre></td></tr></table></figure>
+
+<p>首先运行下面的代码来查看虚拟机的基本信息：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">System.out.println(VM.current().details());</span><br><span class="line"></span><br><span class="line">控制台打印出以下的内容：</span><br><span class="line"></span><br><span class="line"># Running 64-bit HotSpot VM.</span><br><span class="line"># Using compressed oop with 0-bit shift.</span><br><span class="line"># Using compressed klass with 3-bit shift.</span><br><span class="line"># Objects are 8 bytes aligned.</span><br><span class="line"># Field sizes by type: 4, 1, 1, 2, 2, 4, 4, 8, 8 [bytes]</span><br><span class="line"># Array element sizes: 4, 1, 1, 2, 2, 4, 4, 8, 8 [bytes]</span><br></pre></td></tr></table></figure>
+
+<p>以上表明，引用类型占据4字节，boolean和byte占据1字节，short和char占据2字节，int和float占据4字节，long和double占据8字节；如果这些类型用作数据元素的时候，它们占据相同的内存空间。</p>
+<p>如果通过<code>-XX:-UseCompressedOops</code>来禁止压缩的引用，只有引用类型的大小改为8字节：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"># Field sizes by type: 8, 1, 1, 2, 2, 4, 4, 8, 8 [bytes]</span><br><span class="line"># Array element sizes: 8, 1, 1, 2, 2, 4, 4, 8, 8 [bytes]</span><br></pre></td></tr></table></figure>
+
+<p>下面看一个简单的类：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">public class SimpleInt &#123;</span><br><span class="line">    private int state;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>打印该类的内存布局：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">System.out.println(ClassLayout.parseClass(SimpleInt.class).toPrintable());</span><br></pre></td></tr></table></figure>
+
+<p>控制台显示：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">OFFSET  SIZE   TYPE DESCRIPTION                               VALUE</span><br><span class="line">      0    12        (object header)                           N&#x2F;A</span><br><span class="line">     12     4    int SimpleInt.state                           N&#x2F;A</span><br><span class="line">Instance size: 16 bytes</span><br><span class="line">Space losses: 0 bytes internal + 0 bytes external &#x3D; 0 bytes total</span><br></pre></td></tr></table></figure>
+
+<p>从上面可以看出，对象头部占有12字节，包括8字节mark和4字节klass，后面还有4字节用于int类型的字段state。这个类的任何对象将会消耗16字节的空间。</p>
+<h4 id="Identity-Hash-Code"><a href="#Identity-Hash-Code" class="headerlink" title="Identity Hash Code"></a>Identity Hash Code</h4><p>所有的Java对象都有<code>hashCode()</code>方法，当我们没有为一个类声明<code>hashCode()</code>方法时，Java会使用<code>identity hash code</code>作为该方法的返回值。对象的<code>identity hash code</code>在生命周期中不会发生改变，HotSpot虚拟机会在<code>markWord</code>中存储它的值。</p>
+<p>运行下面的代码来获取一个对象实例的内存布局：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">SimpleInt simpleInt &#x3D; new SimpleInt();</span><br><span class="line">System.out.println(ClassLayout.parseInstance(simpleInt).toPrintable());</span><br></pre></td></tr></table></figure>
+
+<p>控制台的输出：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">OFFSET  SIZE   TYPE DESCRIPTION                               VALUE</span><br><span class="line">      0     4        (object header)                           01 00 00 00 (00000001 00000000 00000000 00000000) (1)</span><br><span class="line">      4     4        (object header)                           00 00 00 00 (00000000 00000000 00000000 00000000) (0)</span><br><span class="line">      8     4        (object header)                           43 c1 00 20 (01000011 11000001 00000000 00100000) (536920387)</span><br><span class="line">     12     4    int SimpleInt.state                           0</span><br><span class="line">Instance size: 16 bytes</span><br><span class="line">Space losses: 0 bytes internal + 0 bytes external &#x3D; 0 bytes total</span><br></pre></td></tr></table></figure>
+
+<p>当前，<code>markWord</code>似乎没有存储任何重要的东西，但是，如果调用<code>System.identityHashCode()</code>或<code>Object.hashCode()</code>，那么情况就会发生改变：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">System.out.println(&quot;identity hash code : &quot; + System.identityHashCode(simpleInt));</span><br><span class="line">System.out.println(ClassLayout.parseInstance(simpleInt).toPrintable());</span><br></pre></td></tr></table></figure>
+
+<p>控制台输出：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">identity hash code : 1956725890</span><br><span class="line">com.vidots.stock.jml.SimpleInt object internals:</span><br><span class="line"> OFFSET  SIZE   TYPE DESCRIPTION                               VALUE</span><br><span class="line">      0     4        (object header)                           01 82 44 a1 (00000001 10000010 01000100 10100001) (-1589345791)</span><br><span class="line">      4     4        (object header)                           74 00 00 00 (01110100 00000000 00000000 00000000) (116)</span><br><span class="line">      8     4        (object header)                           43 c1 00 20 (01000011 11000001 00000000 00100000) (536920387)</span><br><span class="line">     12     4    int SimpleInt.state                           0</span><br><span class="line">Instance size: 16 bytes</span><br><span class="line">Space losses: 0 bytes internal + 0 bytes external &#x3D; 0 bytes total</span><br></pre></td></tr></table></figure>
+
+<p>HotSpot虚拟机存储<code>identity hashcode</code>作为<code>82 44 a1 74</code>，记住，虚拟机存储这个值是以little-endian的格式，因此十进制<code>1956725890</code>恢复的话，是<code>74 a1 44 82</code>.</p>
+<h4 id="对齐Alignment"><a href="#对齐Alignment" class="headerlink" title="对齐Alignment"></a>对齐Alignment</h4><p>默认虚拟机会添加足够的<code>padding</code>到对象上，以使对象的大小是8的倍数，例如：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">public class SimpleLong &#123;</span><br><span class="line">    private long state;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>解析一下内存布局：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">System.out.println(ClassLayout.parseClass(SimpleLong.class).toPrintable());</span><br></pre></td></tr></table></figure>
+
+<p>控制台的打印为：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">com.vidots.stock.jml.SimpleLong object internals:</span><br><span class="line"> OFFSET  SIZE   TYPE DESCRIPTION                               VALUE</span><br><span class="line">      0    12        (object header)                           N&#x2F;A</span><br><span class="line">     12     4        (alignment&#x2F;padding gap)                  </span><br><span class="line">     16     8   long SimpleLong.state                          N&#x2F;A</span><br><span class="line">Instance size: 24 bytes</span><br><span class="line">Space losses: 4 bytes internal + 0 bytes external &#x3D; 4 bytes total</span><br></pre></td></tr></table></figure>
+
+<p>从上面看出，对象的头部和<code>long</code>类型的字段<code>state</code>一共消耗20字节，为了使得这个大小是8字节的倍数，虚拟机添加了4字节的<code>padding</code>。我们可以通过<code>-XX:ObjectAlignmentInBytes</code>来改变默认的对齐大小。例如，对于上面的<code>SimpleLong</code>类，设置<code>-XX:ObjectAlignmentInBytes=16</code>选项的话，内存布局为：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">com.vidots.stock.jml.SimpleLong object internals:</span><br><span class="line"> OFFSET  SIZE   TYPE DESCRIPTION                               VALUE</span><br><span class="line">      0    12        (object header)                           N&#x2F;A</span><br><span class="line">     12     4        (alignment&#x2F;padding gap)                  </span><br><span class="line">     16     8   long SimpleLong.state                          N&#x2F;A</span><br><span class="line">     24     8        (loss due to the next object alignment)</span><br><span class="line">Instance size: 32 bytes</span><br><span class="line">Space losses: 4 bytes internal + 8 bytes external &#x3D; 12 bytes total</span><br></pre></td></tr></table></figure>
+
+<p>对象的头部和<code>long</code>类型变量仍然消耗20字节，所以添加12个字节来让它是16的倍数；虚拟机添加4个内部的padding字节来，接着才是<code>long</code>类型变量，然后在<code>long</code>类型变量后面添加8个外部的字节。</p>
+<h4 id="字段调序"><a href="#字段调序" class="headerlink" title="字段调序"></a>字段调序</h4><p>当一个类有多个字段时，虚拟机可能会对这些字段进行调整，例如：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">public class MultiFields &#123;</span><br><span class="line">    private boolean first;</span><br><span class="line">    private char second;</span><br><span class="line">    private double third;</span><br><span class="line">    private int fourth;</span><br><span class="line">    private boolean fifth;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>字段声明顺序和内存布局中的顺序是不同的：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">com.vidots.stock.jml.MultiFields object internals:</span><br><span class="line"> OFFSET  SIZE      TYPE DESCRIPTION                               VALUE</span><br><span class="line">      0    12           (object header)                           N&#x2F;A</span><br><span class="line">     12     4       int MultiFields.fourth                        N&#x2F;A</span><br><span class="line">     16     8    double MultiFields.third                         N&#x2F;A</span><br><span class="line">     24     2      char MultiFields.second                        N&#x2F;A</span><br><span class="line">     26     1   boolean MultiFields.first                         N&#x2F;A</span><br><span class="line">     27     1   boolean MultiFields.fifth                         N&#x2F;A</span><br><span class="line">     28     4           (loss due to the next object alignment)</span><br><span class="line">Instance size: 32 bytes</span><br><span class="line">Space losses: 0 bytes internal + 4 bytes external &#x3D; 4 bytes total</span><br></pre></td></tr></table></figure>
+
+<p>这样的目的是为了减少padding的浪费。</p>
+<h4 id="锁"><a href="#锁" class="headerlink" title="锁"></a>锁</h4><p>虚拟机在<code>markWord</code>中也存储了锁相关信息，对于下面的类：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">public class Lock() &#123;&#125;</span><br></pre></td></tr></table></figure>
+
+<p>创建一个实例，那么该实例的内存布局如下：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">com.vidots.stock.jml.Lock object internals:</span><br><span class="line"> OFFSET  SIZE   TYPE DESCRIPTION                               VALUE</span><br><span class="line">      0     4        (object header)                           01 00 00 00 (00000001 00000000 00000000 00000000) (1)</span><br><span class="line">      4     4        (object header)                           00 00 00 00 (00000000 00000000 00000000 00000000) (0)</span><br><span class="line">      8     4        (object header)                           43 c1 00 20 (01000011 11000001 00000000 00100000) (536920387)</span><br><span class="line">     12     4        (loss due to the next object alignment)</span><br><span class="line">Instance size: 16 bytes</span><br><span class="line">Space losses: 0 bytes internal + 4 bytes external &#x3D; 4 bytes total</span><br></pre></td></tr></table></figure>
+
+<p>如果对该实例进行加锁，内存布局为：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">com.vidots.stock.jml.Lock object internals:</span><br><span class="line"> OFFSET  SIZE   TYPE DESCRIPTION                               VALUE</span><br><span class="line">      0     4        (object header)                           18 f1 e8 02 (00011000 11110001 11101000 00000010) (48820504)</span><br><span class="line">      4     4        (object header)                           00 00 00 00 (00000000 00000000 00000000 00000000) (0)</span><br><span class="line">      8     4        (object header)                           43 c1 00 20 (01000011 11000001 00000000 00100000) (536920387)</span><br><span class="line">     12     4        (loss due to the next object alignment)</span><br><span class="line">Instance size: 16 bytes</span><br><span class="line">Space losses: 0 bytes internal + 4 bytes external &#x3D; 4 bytes total</span><br></pre></td></tr></table></figure>
+
+<p>可以看出，当握住<code>monitor</code>锁时，<code>markWord</code>的<code>bit-pattern</code>就会发生变化。</p>
+<h4 id="对象存活时间"><a href="#对象存活时间" class="headerlink" title="对象存活时间"></a>对象存活时间</h4><p>为了促使一个对象进入年老代，虚拟机需要跟踪每个对象的存活次数，虚拟机也是在<code>markWord</code>中保存这个信息的。</p>
+<p>为了模拟minor GC，我们会创建许多垃圾；并且将一个对象分配给<code>volatile</code>变量，目的是防止JIT编译器可能执行的死码消除。</p>
+<p>注：死码消除（Dead code elimination）是一种编译器原理中编译最优化技术，它的用途是移除对程序运行结果没有任何影响的代码。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line">public class MinorGC &#123;</span><br><span class="line"></span><br><span class="line">    volatile Object consumer;</span><br><span class="line"></span><br><span class="line">    public void testLock() &#123;</span><br><span class="line">        Object instance &#x3D; new Object();</span><br><span class="line">        long lastAddr &#x3D; VM.current().addressOf(instance);</span><br><span class="line">        ClassLayout layout &#x3D; ClassLayout.parseInstance(instance);</span><br><span class="line"></span><br><span class="line">        for (int i &#x3D; 0; i &lt; 10_000; i++) &#123;</span><br><span class="line">            long currentAddr &#x3D; VM.current().addressOf(instance);</span><br><span class="line">            if (currentAddr !&#x3D; lastAddr) &#123;</span><br><span class="line">                System.out.println(layout.toPrintable());</span><br><span class="line">            &#125;</span><br><span class="line"></span><br><span class="line">            for (int j &#x3D; 0; j &lt; 10_000; j++) &#123;</span><br><span class="line">                consumer &#x3D; new Object();</span><br><span class="line">            &#125;</span><br><span class="line"></span><br><span class="line">            lastAddr &#x3D; currentAddr;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>每次一个存活对象的地址发生变化的时候，可能是因为minor GC和survivor space之间的移动。从控制台的打印来看，对象的地址发生了变化。</p>
+<h4 id="数组"><a href="#数组" class="headerlink" title="数组"></a>数组</h4><p>数组长度也是数组oop的一部分，例如下面的代码：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">boolean[] booleans &#x3D; new boolean[3];</span><br><span class="line">System.out.println(ClassLayout.parseInstance(booleans).toPrintable());</span><br></pre></td></tr></table></figure>
+
+<p>控制台的打印：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"> OFFSET  SIZE      TYPE DESCRIPTION                               VALUE</span><br><span class="line">      0     4           (object header)                           01 00 00 00 (00000001 00000000 00000000 00000000) (1)</span><br><span class="line">      4     4           (object header)                           00 00 00 00 (00000000 00000000 00000000 00000000) (0)</span><br><span class="line">      8     4           (object header)                           05 00 00 20 (00000101 00000000 00000000 00100000) (536870917)</span><br><span class="line">     12     4           (object header)                           03 00 00 00 (00000011 00000000 00000000 00000000) (3) # 数组长度</span><br><span class="line">     16     3   boolean [Z.&lt;elements&gt;                             N&#x2F;A</span><br><span class="line">     19     5           (loss due to the next object alignment)</span><br><span class="line">Instance size: 24 bytes</span><br><span class="line">Space losses: 0 bytes internal + 5 bytes external &#x3D; 5 bytes total</span><br></pre></td></tr></table></figure>
+
+<p>对象的头部占有16字节，包含8字节的<code>markWord</code>，4字节的<code>Klass</code>，4字节的长度，后面就是3字节的含有3个元素的数组。</p>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/%E6%8A%80%E6%9C%AF%E7%A0%94%E7%A9%B6/" rel="tag"># 技术研究</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2020/12/22/jvm-oom/" rel="next" title="由OutOfMemoryError引发的总结与思考">
+                <i class="fa fa-chevron-left"></i> 由OutOfMemoryError引发的总结与思考
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name"></p>
+              <p class="site-description motion-element" itemprop="description"></p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/%7C%7C%20archive">
+              
+                  <span class="site-state-item-count">3</span>
+                  <span class="site-state-item-name">日志</span>
+                </a>
+              </div>
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-categories">
+                <a href="/categories/index.html">
+                  <span class="site-state-item-count">1</span>
+                  <span class="site-state-item-name">分类</span>
+                </a>
+              </div>
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                <a href="/tags/index.html">
+                  <span class="site-state-item-count">2</span>
+                  <span class="site-state-item-name">标签</span>
+                </a>
+              </div>
+            
+
+          </nav>
+
+          
+
+          
+
+          
+          
+
+          
+          
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#JMX%E7%9A%84%E5%9F%BA%E6%9C%AC%E4%BB%8B%E7%BB%8D"><span class="nav-number">1.</span> <span class="nav-text">JMX的基本介绍</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#JMX%E7%9A%84%E6%9E%B6%E6%9E%84"><span class="nav-number">1.0.0.1.</span> <span class="nav-text">JMX的架构</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%88%9B%E5%BB%BAMBean%E7%B1%BB"><span class="nav-number">1.0.0.2.</span> <span class="nav-text">创建MBean类</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E4%BD%BF%E7%94%A8JMX%E4%BB%A3%E7%90%86%E8%BF%9B%E8%A1%8C%E8%AF%8A%E6%96%AD"><span class="nav-number">1.0.0.3.</span> <span class="nav-text">使用JMX代理进行诊断</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E8%8E%B7%E5%8F%96MBean"><span class="nav-number">1.0.0.4.</span> <span class="nav-text">获取MBean</span></a></li></ol></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%8D%95%E8%8E%B7Java%E5%A0%86%E7%9A%84Dump"><span class="nav-number">2.</span> <span class="nav-text">捕获Java堆的Dump</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E8%87%AA%E5%8A%A8%E6%8D%95%E8%8E%B7%E5%A0%86%E7%9A%84dump-%E6%8E%A8%E8%8D%90"><span class="nav-number">2.0.0.1.</span> <span class="nav-text">自动捕获堆的dump(推荐)</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#jmap"><span class="nav-number">2.0.0.2.</span> <span class="nav-text">jmap</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#jcmd"><span class="nav-number">2.0.0.3.</span> <span class="nav-text">jcmd</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#JVisualVM"><span class="nav-number">2.0.0.4.</span> <span class="nav-text">JVisualVM</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#JMX"><span class="nav-number">2.0.0.5.</span> <span class="nav-text">JMX</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E7%BC%96%E7%A8%8B%E6%96%B9%E5%BC%8F"><span class="nav-number">2.0.0.6.</span> <span class="nav-text">编程方式</span></a></li></ol></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%AF%B9%E8%B1%A1%E7%9A%84%E5%86%85%E5%AD%98%E5%B8%83%E5%B1%80"><span class="nav-number">3.</span> <span class="nav-text">对象的内存布局</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#OOP-Ordinary-Object-Pointer"><span class="nav-number">3.0.0.1.</span> <span class="nav-text">OOP(Ordinary Object Pointer)</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%A3%80%E6%9F%A5%E5%86%85%E5%AD%98%E5%B8%83%E5%B1%80"><span class="nav-number">3.0.0.2.</span> <span class="nav-text">检查内存布局</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Identity-Hash-Code"><span class="nav-number">3.0.0.3.</span> <span class="nav-text">Identity Hash Code</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%AF%B9%E9%BD%90Alignment"><span class="nav-number">3.0.0.4.</span> <span class="nav-text">对齐Alignment</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%AD%97%E6%AE%B5%E8%B0%83%E5%BA%8F"><span class="nav-number">3.0.0.5.</span> <span class="nav-text">字段调序</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E9%94%81"><span class="nav-number">3.0.0.6.</span> <span class="nav-text">锁</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%AF%B9%E8%B1%A1%E5%AD%98%E6%B4%BB%E6%97%B6%E9%97%B4"><span class="nav-number">3.0.0.7.</span> <span class="nav-text">对象存活时间</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%95%B0%E7%BB%84"><span class="nav-number">3.0.0.8.</span> <span class="nav-text">数组</span></a></li></ol></li></ol></li></ol></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2021</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">vidots</span>
+
+  
+</div>
+
+
+  <div class="powered-by">由 <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a> 强力驱动</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Muse</a> v5.1.4</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>
