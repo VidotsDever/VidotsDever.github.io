@@ -635,128 +635,14 @@
 
       
         
-          
-            <p>在平时的开发中，涉及到的加密、解密功能基本上都是使用语言自带的库函数来完成，或者使用第三方开源的库。最近想探究下这些加密、解密算法的实现机制，下面大概记录了相关的探究过程。</p>
-<p>!–more–&gt; </p>
-<h1 id="计算机的编码"><a href="#计算机的编码" class="headerlink" title="计算机的编码"></a>计算机的编码</h1><h4 id="原码、反码、补码"><a href="#原码、反码、补码" class="headerlink" title="原码、反码、补码"></a>原码、反码、补码</h4><p><a target="_blank" rel="noopener" href="https://blog.csdn.net/zl10086111/article/details/80907428">原码、反码、补码知识详细讲解</a></p>
-<ul>
-<li>原码：符号位+真值的绝对值，即用第一位表示符号，其余位表示值。所以8位二进制数的取值范围为<code>[1111 1111, 0111 1111]</code>，即<code>[-127, 127]</code> ；</li>
-<li>反码：正数的反码是其本身，负数的反码是在其原码的基础上，符号位不变，其余各位取反；</li>
-<li>补码：正数的补码是其本身，负数的补码是在其反码的基础上加1；</li>
-</ul>
-<p>注意：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line">String str &#x3D; &quot;好&quot;;</span><br><span class="line">byte[] bytes &#x3D; str.getBytes(StandardCharsets.UTF_8);</span><br><span class="line">for (byte b:bytes) &#123;</span><br><span class="line">  System.out.println(b);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">代码运行的结果：</span><br><span class="line">-27</span><br><span class="line">-91</span><br><span class="line">-67</span><br><span class="line"></span><br><span class="line">为什么上面代码运行的结果是负数呢？</span><br><span class="line">&quot;好&quot;的UTF-8二进制编码为：11100101 10100101 10111101</span><br><span class="line"></span><br><span class="line">[11100101]补 &#x3D; [10011011]原&#x3D; [-27]十进制(byte)</span><br><span class="line">[10100101]补 &#x3D; [11011011]原&#x3D; [-91]十进制(byte)</span><br><span class="line">[10111101]补 &#x3D; [11000011]原&#x3D; [-67]十进制(byte)</span><br><span class="line"></span><br><span class="line">在Java中，数值类型的数据才使用补码表示；而对于字符来说，它是通过字符集（如UTF-8、GBK等）进行编码的，直接存储字节数即可。</span><br></pre></td></tr></table></figure>
-
-
-
-<h4 id="字符集"><a href="#字符集" class="headerlink" title="字符集"></a>字符集</h4><p><a target="_blank" rel="noopener" href="https://www.cnblogs.com/Hays4Blog/p/6755550.html">Java中的常用字符编码ASCII、Unicode和UTF-8</a></p>
-<p>在计算机内部，所有的信息最终都表示为一个二进制的字符串。每一个二进制位（<strong>bit</strong>）有0和1两种状态，因此八个二进制位就可以组合出256种状态，这被称为一个字节（<strong>byte</strong>）。也就是说，一个字节一共可以用来表示256种不同的状态，每一个状态对应一个符号，就是256个符号，从0000000到11111111。</p>
-<p><strong>ASCII码</strong>：上个世纪60年代，美国制定了一套字符编码，对英语字符与二进制位之间的关系，做了统一规定。这被称为ASCII码，一直沿用至今。ASCII码一共规定了128个字符的编码，比如空格“SPACE”是32（二进制00100000），大写的字母A是65（二进制01000001）。这128个符号（包括32个不能打印出来的控制符号），只占用了一个字节的后面7位，最前面的1位统一规定为0。</p>
-<p><strong>UTF-8：</strong>UTF-8是Unicode的实现方式之一，UTF-8是一种变长的编码方式。它可以使用1~4个字节表示一个符号，根据不同的符号而变化字节长度。UTF-8的编码规则:</p>
-<ul>
-<li>单字节的符号，字节的第一位(<strong>bit</strong>)规定为0，后面7位为这个符号的Unicode码。因此对于英语字母，UTF-8编码和ASCII码是相同的；</li>
-<li>n字节的符号（n&gt;1），第一个字节的前n位都设为1，第n+1位设为0，后面字节的前两位一律设为10。剩下的没有提及的二进制位，全部为这个符号的Unicode码；</li>
-</ul>
-<h1 id="编码方式"><a href="#编码方式" class="headerlink" title="编码方式"></a>编码方式</h1><h4 id="Base64编码"><a href="#Base64编码" class="headerlink" title="Base64编码"></a>Base64编码</h4><p><a target="_blank" rel="noopener" href="http://www.ruanyifeng.com/blog/2008/06/base64.html">Base64笔记</a></p>
-<p>Base64，即选出64个字符—-小写字母a-z、大写字母A-Z、数字0-9、符号”+”、”/“（再加上作为垫字的”=”，实际上是65个字符）—-作为一个基本字符集，然后其他所有符号都转换成这个字符集中的字符。</p>
-<p>Base64转换方式：</p>
-<ol>
-<li>将每三个字节作为一组，一共是24个二进制位；</li>
-<li>将这24个二进制位分为四组，每个组有6个二进制位；</li>
-<li>在每组前面加两个00，扩展成32个二进制位，即四个字节；</li>
-<li>根据下表，得到扩展后的每个字节的对应符号，这就是Base64的编码值；</li>
-</ol>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br></pre></td><td class="code"><pre><span class="line">0　A　　17　R　　　34　i　　　51　z</span><br><span class="line"></span><br><span class="line">1　B　　18　S　　　35　j　　　52　0</span><br><span class="line"></span><br><span class="line">2　C　　19　T　　　36　k　　　53　1</span><br><span class="line"></span><br><span class="line">3　D　　20　U　　　37　l　　　54　2</span><br><span class="line"></span><br><span class="line">4　E　　21　V　　　38　m　　　55　3</span><br><span class="line"></span><br><span class="line">5　F　　22　W　　　39　n　　　56　4</span><br><span class="line"></span><br><span class="line">6　G　　23　X　　　40　o　　　57　5</span><br><span class="line"></span><br><span class="line">7　H　　24　Y　　　41　p　　　58　6</span><br><span class="line"></span><br><span class="line">8　I　　25　Z　　　42　q　　　59　7</span><br><span class="line"></span><br><span class="line">9　J　　26　a　　　43　r　　　60　8</span><br><span class="line"></span><br><span class="line">10　K　　27　b　　 44　s　　　61　9</span><br><span class="line"></span><br><span class="line">11　L　　28　c　　　45　t　　　62　+</span><br><span class="line"></span><br><span class="line">12　M　　29　d　　　46　u　　　63　&#x2F;</span><br><span class="line"></span><br><span class="line">13　N　　30　e　　　47　v</span><br><span class="line"></span><br><span class="line">14　O　　31　f　　　48　w　　　</span><br><span class="line"></span><br><span class="line">15　P　　32　g　　　49　x</span><br><span class="line"></span><br><span class="line">16　Q　　33　h　　　50　y</span><br></pre></td></tr></table></figure>
-
-
-
-<h4 id="对称加密和非对称加密"><a href="#对称加密和非对称加密" class="headerlink" title="对称加密和非对称加密"></a>对称加密和非对称加密</h4><p><strong>对称加密</strong>：加密方和解密方使用同一密钥；加密和解密的速度比较快，适用于需要加密的数据量比较大时；密钥传输的过程不安全，且容易被破解，密钥管理也比较麻烦：</p>
-<ul>
-<li><strong>DES（Data Encryption Standard）</strong>：数据加密标准，速度较快，适用于加密大量数据的场合；</li>
-<li><strong>3DES（Triple DES）</strong>：是基于DES，对一块数据用三个不同的密钥进行三次加密，强度更高；</li>
-<li> <strong>AES（Advanced Encryption Standard）</strong>：高级加密标准，是下一代的加密算法标准，速度快，安全级别高；</li>
-</ul>
-<p><strong>非对称加密</strong>：即公私钥加密，加密和解密使用的是两个不同的密钥，假设两个用户要加密交换数据，双方交换公钥，使用时一方用对方的公钥加密，另一方即可用自己的私钥解密：</p>
-<ul>
-<li><strong>RSA：</strong>由 RSA 公司发明，是一个支持变长密钥的公共密钥算法，需要加密的文件块的长度也是可变；</li>
-<li><strong>DSA（Digital Signature Algorithm）</strong>：数字签名算法，是一种标准的 DSS（数字签名标准）；</li>
-<li><strong>ECC（Elliptic Curves Cryptography）</strong>：椭圆曲线密码编码学；</li>
-</ul>
-<p><strong>公钥负责加密，私钥负责解密</strong>；<strong>私钥负责签名，公钥负责验证</strong></p>
-<h4 id="散列算法："><a href="#散列算法：" class="headerlink" title="散列算法："></a>散列算法：</h4><p>散列是信息的提炼，通常其长度要比信息小得多，且为一个固定长度。加密性强的散列一定是不可逆的，这就意味着通过散列结果，无法推出任何部分的原始信息。散列应该是防冲突的，即找不出具有相同散列结果的两条信息。具有这些特性的散列结果就可以用于验证信息是否被修改。</p>
-<p>散列算法是一种单向算法，用户可以通过Hash算法对目标信息生成一段特定长度的、唯一的Hash值，却不能通过这个Hash值重新获得目标信息。因此Hash算法常用在不可还原的密码存储、信息完整性校验等。</p>
-<p>常见的Hash算法：</p>
-<ul>
-<li><strong>MD5（Message Digest Algorithm 5）：</strong>是RSA数据安全公司开发的一种单向散列算法，非可逆，相同的明文产生相同的密文</li>
-<li><strong>SHA（Secure Hash Algorithm）：</strong>可以对任意长度的数据运算生成一个160位的数值</li>
-</ul>
-<h4 id="HTTPS涉及到的加密、解密"><a href="#HTTPS涉及到的加密、解密" class="headerlink" title="HTTPS涉及到的加密、解密"></a>HTTPS涉及到的加密、解密</h4><p><a target="_blank" rel="noopener" href="https://zhuanlan.zhihu.com/p/97154765">你知道，HTTPS用的是对称加密还是非对称加密</a></p>
-<p>HTTPS 在<strong>内容传输的加密上使用的是对称加密，非对称加密只作用在证书验证阶段</strong>。</p>
-<p><strong>HTTPS的整体过程分为证书验证和数据传输阶段，具体的交互过程如下：</strong></p>
-<p><strong>① 证书验证阶段：</strong></p>
-<blockquote>
-<p>1）浏览器发起 HTTPS 请求；<br>2）服务端返回 HTTPS 证书；<br>3）客户端验证证书是否合法，如果不合法则提示告警。</p>
-</blockquote>
-<p><strong>② 数据传输阶段：</strong></p>
-<blockquote>
-<p>1）当证书验证合法后，在本地生成随机数；<br>2）通过公钥加密随机数，并把加密后的随机数传输到服务端；<br>3）服务端通过私钥对随机数进行解密；<br>4）服务端通过客户端传入的随机数构造对称加密算法，对返回结果内容进行加密后传输。</p>
-</blockquote>
-<h1 id="Java实现"><a href="#Java实现" class="headerlink" title="Java实现"></a>Java实现</h1><h4 id="非对称加密、解密"><a href="#非对称加密、解密" class="headerlink" title="非对称加密、解密"></a>非对称加密、解密</h4><p>生成公钥、私钥：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;&#x2F; KeyPairGenerator类用于生成公钥和私钥对，基于RSA算法生成对象</span><br><span class="line">KeyPairGenerator keyPairGen &#x3D; KeyPairGenerator.getInstance(&quot;RSA&quot;);</span><br><span class="line"></span><br><span class="line">&#x2F;&#x2F; 初始化密钥对生成器，密钥大小为96-1024位</span><br><span class="line">keyPairGen.initialize(1024, new SecureRandom());</span><br><span class="line"></span><br><span class="line">&#x2F;&#x2F; 生成一个密钥对，保存在keyPair中</span><br><span class="line">KeyPair keyPair &#x3D; keyPairGen.generateKeyPair();</span><br><span class="line"></span><br><span class="line">RSAPrivateKey privateKey &#x3D; (RSAPrivateKey) keyPair.getPrivate();</span><br><span class="line">RSAPublicKey publicKey &#x3D; (RSAPublicKey) keyPair.getPublic();</span><br><span class="line"></span><br><span class="line">&#x2F;&#x2F; 得到公钥字符串</span><br><span class="line">String publicKeyStr &#x3D; new String(Base64.getEncoder().encode(publicKey.getEncoded()));</span><br><span class="line"></span><br><span class="line">&#x2F;&#x2F; 得到私钥字符串</span><br><span class="line">String privateKeyStr &#x3D; new String(Base64.getEncoder().encode(privateKey.getEncoded()));</span><br></pre></td></tr></table></figure>
-
-<p>使用公钥进行加密：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">String expr &#x3D; &quot;i love you&quot;;</span><br><span class="line"></span><br><span class="line">RSAPublicKey pubKey &#x3D; (RSAPublicKey) KeyFactory.getInstance(&quot;RSA&quot;).generatePublic(new X509EncodedKeySpec(Base64.getDecoder().decode(publicKeyStr)));</span><br><span class="line"></span><br><span class="line">Cipher cipherEcry &#x3D; Cipher.getInstance(&quot;RSA&quot;);</span><br><span class="line">cipherEcry.init(Cipher.ENCRYPT_MODE, pubKey);</span><br><span class="line"></span><br><span class="line">String encryStr &#x3D; Base64.getEncoder().encodeToString(cipherEcry.doFinal(expr.getBytes()));</span><br></pre></td></tr></table></figure>
-
-<p>使用私钥进行解密：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">byte[] inputByte &#x3D; Base64.getDecoder().decode(encryStr.getBytes());</span><br><span class="line"></span><br><span class="line">RSAPrivateKey priKey &#x3D; (RSAPrivateKey)KeyFactory.getInstance(&quot;RSA&quot;).generatePrivate(new PKCS8EncodedKeySpec(Base64.getDecoder().decode(privateKeyStr)));</span><br><span class="line"></span><br><span class="line">Cipher cipherDecry &#x3D; Cipher.getInstance(&quot;RSA&quot;);</span><br><span class="line">cipherDecry.init(Cipher.DECRYPT_MODE, priKey);</span><br><span class="line"></span><br><span class="line">String decryStr &#x3D; new String(cipherDecry.doFinal(inputByte));</span><br></pre></td></tr></table></figure>
-
-
-
-<h4 id="消息摘要"><a href="#消息摘要" class="headerlink" title="消息摘要"></a>消息摘要</h4><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">String message &#x3D; &quot;i love you&quot;;</span><br><span class="line">&#x2F;&#x2F; MessageDigest md &#x3D; MessageDigest.getInstance(&quot;SHA-1&quot;);</span><br><span class="line">MessageDigest md &#x3D; MessageDigest.getInstance(&quot;MD5&quot;);</span><br><span class="line">md.update(message.getBytes());</span><br><span class="line">byte[] digest &#x3D; md.digest();</span><br><span class="line">System.out.println(&quot;消息摘要：&quot; + byte2hex(digest));</span><br></pre></td></tr></table></figure>
-
-
-
-<h4 id="数字签名与验证"><a href="#数字签名与验证" class="headerlink" title="数字签名与验证"></a>数字签名与验证</h4><p>生成公钥、私钥文件：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line">java.security.KeyPairGenerator keygen &#x3D;</span><br><span class="line">                java.security.KeyPairGenerator.getInstance(&quot;DSA&quot;);</span><br><span class="line">keygen.initialize(512);</span><br><span class="line">&#x2F;&#x2F; 生成密钥组</span><br><span class="line">KeyPair keys &#x3D; keygen.genKeyPair();</span><br><span class="line">PublicKey pubkey &#x3D; keys.getPublic();</span><br><span class="line">PrivateKey prikey &#x3D; keys.getPrivate();</span><br><span class="line">&#x2F;&#x2F; 将私钥写入文件中</span><br><span class="line">ObjectOutputStream out &#x3D; new ObjectOutputStream(new FileOutputStream(&quot;private.key&quot;));</span><br><span class="line">out.writeObject(prikey);</span><br><span class="line">out.close();</span><br><span class="line"></span><br><span class="line">&#x2F;&#x2F; 将公钥写入文件中</span><br><span class="line">out &#x3D; new ObjectOutputStream(new FileOutputStream(&quot;public.key&quot;));</span><br><span class="line">out.writeObject(pubkey);</span><br><span class="line">out.close();</span><br></pre></td></tr></table></figure>
-
-
-
-<p>生成数字签名：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;&#x2F; 从文件中读取私钥，将一个字符串以及其签名保存在一个文件中(字符串和其签名也可以放在不同文件中&#x2F;‘)</span><br><span class="line">ObjectInputStream in &#x3D; new ObjectInputStream(new FileInputStream(&quot;private.key&quot;));</span><br><span class="line">PrivateKey priKey &#x3D; (PrivateKey) in.readObject();</span><br><span class="line">in.close();</span><br><span class="line">String message &#x3D; &quot;i love you&quot;;</span><br><span class="line">&#x2F;&#x2F; 用私钥对信息生成数字签名</span><br><span class="line">Signature signature &#x3D; Signature.getInstance(&quot;DSA&quot;);</span><br><span class="line">signature.initSign(priKey);</span><br><span class="line">signature.update(message.getBytes());</span><br><span class="line">&#x2F;&#x2F; 对信息的数字签名</span><br><span class="line">byte[] signed &#x3D; signature.sign();</span><br><span class="line">&#x2F;&#x2F; 把信息和数字签名保存在一个文件中</span><br><span class="line">ObjectOutputStream outTarget &#x3D; new ObjectOutputStream(new FileOutputStream(&quot;signed&quot;));</span><br><span class="line">outTarget.writeObject(message);</span><br><span class="line">outTarget.writeObject(signed);</span><br><span class="line">out.close();</span><br></pre></td></tr></table></figure>
-
-<p>对数字签名进行验证：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">ObjectInputStream targetIn &#x3D; new ObjectInputStream(new FileInputStream(&quot;public.key&quot;));</span><br><span class="line">PublicKey pubKey &#x3D; (PublicKey)targetIn.readObject();</span><br><span class="line">targetIn.close();</span><br><span class="line">System.out.println(&quot;-----format---&quot; + pubKey.getFormat());</span><br><span class="line">targetIn &#x3D; new ObjectInputStream(new FileInputStream(&quot;signed&quot;));</span><br><span class="line">String msg &#x3D; (String)targetIn.readObject();</span><br><span class="line">byte[] sign &#x3D; (byte[])targetIn.readObject();</span><br><span class="line">targetIn.close();</span><br><span class="line">Signature check &#x3D; Signature.getInstance(&quot;DSA&quot;);</span><br><span class="line">check.initVerify(pubKey);</span><br><span class="line">check.update(msg.getBytes());</span><br><span class="line">System.out.println(check.verify(sign));</span><br></pre></td></tr></table></figure>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-          
+          <p>在平时的开发中，涉及到的加密、解密功能基本上都是使用语言自带的库函数来完成，或者使用第三方开源的库。最近想探究下这些加密、解密算法的实现机制，下面大概记录了相关的探究过程。</p>
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2020/08/11/%E5%8A%A0%E5%AF%86%E5%92%8C%E8%A7%A3%E5%AF%86%E9%82%A3%E4%BA%9B%E4%BA%8B/#more" rel="contents">
+              阅读全文 &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
         
       
     </div>
